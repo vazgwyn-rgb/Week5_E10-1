@@ -1,18 +1,14 @@
 using Microsoft.EntityFrameworkCore;
-using ToDoList.Models;
+using TempManager.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRouting(options =>
-{
-    options.LowercaseUrls = true;
-    options.AppendTrailingSlash = true;
-});
-
+// Add services to the container.
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddDbContext<ToDoContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("ToDoContext")));
+builder.Services.AddDbContext<TempManagerContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("TempManagerContext")));
 
 var app = builder.Build();
 
@@ -23,7 +19,7 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-//exercise 10-1
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

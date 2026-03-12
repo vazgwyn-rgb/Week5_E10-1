@@ -1,117 +1,65 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ToDoList.Models;
+using TempManager.Models;
 
-namespace ToDoList.Controllers
+namespace TempManager.Controllers
 {
     public class HomeController : Controller
     {
-        private ToDoContext context;
-        public HomeController(ToDoContext ctx) => context = ctx;
+        private TempManagerContext data { get; set; }
+        public HomeController(TempManagerContext ctx) => data = ctx;
 
-        public ViewResult Index(string id)
+        public ViewResult Index()
         {
-            // load current filters and data needed for filter drop downs in ViewBag
-            var filters = new Filters(id);
-
-            ToDoViewModel vm = new ToDoViewModel
-            {
-                Filters = filters,
-                Categories = context.Categories.ToList(),
-                Statuses = context.Statuses.ToList(),
-                DueFilters = Filters.DueFilterValues
-            };
-
-            // get open tasks from database based on current filters
-            IQueryable<ToDo> query = context.ToDos
-                .Include(t => t.Category).Include(t => t.Status);
-
-            if (filters.HasCategory)
-            {
-                query = query.Where(t => t.CategoryId == filters.CategoryId);
-            }
-            if (filters.HasStatus)
-            {
-                query = query.Where(t => t.StatusId == filters.StatusId);
-            }
-            if (filters.HasDue)
-            {
-                var today = DateTime.Today;
-                if (filters.IsPast)
-                    query = query.Where(t => t.DueDate < today);
-                else if (filters.IsFuture)
-                    query = query.Where(t => t.DueDate > today);
-                else if (filters.IsToday)
-                    query = query.Where(t => t.DueDate == today);
-            }
-            vm.Tasks = query.OrderBy(t => t.DueDate).ToList();
-
-            return View(vm);
+            var temps = data.Temps.OrderBy(t => t.Date).ToList();
+            return View(temps);
         }
 
         [HttpGet]
-        public ViewResult Add()
-        {
-            ToDoViewModel vm = new ToDoViewModel
-            {
-                Categories = context.Categories.ToList(),
-                Statuses = context.Statuses.ToList()
-            };
-
-            vm.CurrentTask.StatusId = "open";
-            return View(vm);
-        }
+        public ViewResult Add() => View(new Temp());
 
         [HttpPost]
-        public IActionResult Add(ToDoViewModel model)
+        public IActionResult Add(Temp temp)
         {
+            if(ModelState.IsValid)
+            {
+                Temp Existing = data.Temps
+                    .FirstOrDefault(t => t.Date == temp.Date);
+                if (Existing != null)
+                {
+                    ModelState.AddModelError(
+                        nameof(Temp.Date),
+                        "That date is in the database already.");
+                }
+            }
             if (ModelState.IsValid)
             {
-                context.ToDos.Add(model.CurrentTask);
-                context.SaveChanges();
+                data.Temps.Add(temp);
+                data.SaveChanges();
+
                 return RedirectToAction("Index");
             }
             else
             {
-                model.Categories = context.Categories.ToList();
-                model.Statuses = context.Statuses.ToList();
-                return View(model);
+                ModelState.AddModelError("", "Please correct all errors");
+                return View(temp);
             }
         }
 
-        [HttpPost]
-        public IActionResult Filter(string[] filter)
+        [HttpGet]
+        public ViewResult Delete(int id)
         {
-            string id = string.Join('-', filter);
-            return RedirectToAction("Index", new { ID = id });
+            var temp = data.Temps.Find(id);
+            return View(temp);
         }
 
         [HttpPost]
-        public IActionResult MarkComplete([FromRoute] string id, ToDo selected)
+        public RedirectToActionResult Delete(Temp temp)
         {
-            selected = context.ToDos.Find(selected.Id)!;  // use null-forgiving operator to suppress null warning
-            if (selected != null)
-            {
-                selected.StatusId = "closed";
-                context.SaveChanges();
-            }
+            data.Remove(temp);
+            data.SaveChanges();
 
-            return RedirectToAction("Index", new { ID = id });
+            return RedirectToAction("Index");
         }
 
-        [HttpPost]
-        public IActionResult DeleteComplete(string id)
-        {
-            var toDelete = context.ToDos
-                .Where(t => t.StatusId == "closed").ToList();
-
-            foreach (var task in toDelete)
-            {
-                context.ToDos.Remove(task);
-            }
-            context.SaveChanges();
-
-            return RedirectToAction("Index", new { ID = id });
-        }
     }
 }
